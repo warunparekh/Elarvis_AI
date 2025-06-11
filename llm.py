@@ -11,7 +11,7 @@ if not HF_TOKEN:
         "(see https://huggingface.co/settings/tokens)."
     )
 
-MODEL_ID = "microsoft/DialoGPT-medium"
+MODEL_ID = "distilgpt2"
 API_URL  = f"https://api-inference.huggingface.co/models/{MODEL_ID}"
 HEADERS  = {"Authorization": f"Bearer {HF_TOKEN}"}
 
