@@ -9,7 +9,7 @@ from db import load_messages, get_persona
 
 # ─── Configuration ────────────────────────────────
 HF_TOKEN   = "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"
-MODEL_ID   = "meta-llama/Llama-2-7b-hf"
+MODEL_ID   = "TheBloke/vicuna-7B-1.1-HF"
 API_URL    = f"https://api-inference.huggingface.co/models/{MODEL_ID}"
 HEADERS    = {"Authorization": f"Bearer {HF_TOKEN}"} if HF_TOKEN else {}
 
