@@ -1,37 +1,57 @@
 # llm.py
 
-import ollama, sys, io, re
+import os
+import sys
+import io
+import re
+import requests
 from db import load_messages, get_persona
 
-MODEL_NAME     = "deepseek-coder"
+# ─── Configuration ────────────────────────────────
+HF_TOKEN   = os.getenv("HF_TOKEN")
+MODEL_ID   = os.getenv("HF_MODEL", "meta-llama/Llama-2-7b-chat-hf")
+API_URL    = f"https://api-inference.huggingface.co/models/{MODEL_ID}"
+HEADERS    = {"Authorization": f"Bearer {HF_TOKEN}"} if HF_TOKEN else {}
+
 DEFAULT_PERSONA = (
-    "Your name is Jarvis. Never call yourself AI or assistant, only Jarvis. "
-    "Developer is Elarvis. Be witty, friendly, curious, adaptive."
+    "Your name is Jarvis. Never call yourself AI or assistant; you are Jarvis. "
+    "Developer is Elarvis. Be witty, friendly, curious, and adaptive."
 )
 
-def build_messages(convo_id, user_prompt):
+# ─── Helpers ────────────────────────────────────────
+def build_prompt(convo_id, user_prompt):
     persona = get_persona(convo_id, DEFAULT_PERSONA)
     history = load_messages(convo_id)
-    msgs = [{"role": "system", "content": persona}]
-    msgs += [{"role": r, "content": c} for r, c in history]
-    msgs.append({"role": "user", "content": user_prompt})
-    return msgs
+    prompt = persona + "\n\n"
+    for role, content in history:
+        speaker = "User" if role == "user" else "Jarvis"
+        prompt += f"{speaker}: {content}\n"
+    prompt += f"User: {user_prompt}\nJarvis:"
+    return prompt
 
-def ollama_chat(messages):
+def huggingface_chat(convo_id, user_prompt):
+    prompt = build_prompt(convo_id, user_prompt)
+    payload = {
+        "inputs": prompt,
+        "parameters": {"max_new_tokens": 300, "temperature": 0.7},
+        "options": {"use_cache": False}
+    }
     try:
-        stream = ollama.chat(model=MODEL_NAME, messages=messages, stream=True)
-        out = []
-        for chunk in stream:
-            if "message" in chunk and "content" in chunk["message"]:
-                out.append(chunk["message"]["content"])
-        return "".join(out).strip()
+        resp = requests.post(API_URL, headers=HEADERS, json=payload, timeout=60)
+        resp.raise_for_status()
+        completion = resp.json()
+        # HF returns [{"generated_text":"..."}]
+        text = completion[0].get("generated_text", "")
+        # strip the prompt from the response
+        return text[len(prompt):].strip()
     except Exception as e:
+        msg = str(e)
+        if "401" in msg or "403" in msg:
+            return "[Model error: Invalid or missing HF_TOKEN]"
         return f"[Model error: {e}]"
 
 def safe_execute(code):
-    buf = io.StringIO()
-    old = sys.stdout
-    sys.stdout = buf
+    buf = io.StringIO(); old = sys.stdout; sys.stdout = buf
     try:
         exec(code, {}, {})
     except Exception as e:
@@ -41,8 +61,8 @@ def safe_execute(code):
     return buf.getvalue().strip() or "[No output]"
 
 def extract_code(text):
+    # run: python: ```python ...
     m = re.search(r'(?i)(?:run:|execute:|python:)\s*(.*)', text)
     if m: return m.group(1)
     m = re.search(r'```(?:python)?\s*([\s\S]*?)```', text)
-    if m: return m.group(1)
-    return None
+    return m.group(1) if m else None
