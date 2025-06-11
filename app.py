@@ -35,32 +35,27 @@ MAX_CONTEXT = 22
 # ─── SIDEBAR: Conversations & Settings ─────────────────
 st.sidebar.title("🤖 JARVIS")
 convos = get_convos()
-names  = [name for _, name in convos]
-
-# Ensure there is at least one conversation
 if not convos:
-    cid = create_convo("Main", DEFAULT_PERSONA)
+    # Ensure at least one conversation exists
+    create_convo("Main", DEFAULT_PERSONA)
     convos = get_convos()
-    names  = [name for _, name in convos]
 
-# Initialize active convo
+names = [name for _, name in convos]
+
+# Initialize or validate active convo
 if "active" not in st.session_state or st.session_state.active not in [cid for cid, _ in convos]:
     st.session_state.active = convos[0][0]
 
-# Compute selected index safely
-try:
-    idx = [cid for cid, _ in convos].index(st.session_state.active)
-except ValueError:
-    idx = 0
-
+# Safe index for radio
+idx = [cid for cid, _ in convos].index(st.session_state.active)
 selected = st.sidebar.radio("Conversations", names, index=idx)
 st.session_state.active = convos[names.index(selected)][0]
 
-# Buttons for convos
+# Conversation controls
 if st.sidebar.button("➕ New Conversation"):
-    new_name = st.sidebar.text_input("Name new convo", key="new")
-    if new_name:
-        cid = create_convo(new_name, DEFAULT_PERSONA)
+    new = st.sidebar.text_input("Name new convo", key="new")
+    if new:
+        cid = create_convo(new, DEFAULT_PERSONA)
         st.session_state.active = cid
         st.experimental_rerun()
 
@@ -75,9 +70,9 @@ if st.sidebar.button("🗑️ Delete Conversation"):
     st.experimental_rerun()
 
 # Mood / Persona editing
-persona = get_persona(st.session_state.active, DEFAULT_PERSONA)
+current_persona = get_persona(st.session_state.active, DEFAULT_PERSONA)
 mood = st.sidebar.selectbox("Jarvis Mood", list(JARVIS_MOODS.keys()))
-persona_text = persona + " " + JARVIS_MOODS[mood]
+persona_text = current_persona + " " + JARVIS_MOODS[mood]
 if st.sidebar.button("💾 Save Persona"):
     set_persona(st.session_state.active, persona_text)
     st.experimental_rerun()
@@ -91,10 +86,10 @@ if st.sidebar.button("📥 Export Chat"):
 st.header("💬 Chat with Jarvis")
 messages = load_messages(st.session_state.active, MAX_CONTEXT)
 
-for idx, (role, msg) in enumerate(messages):
+for i, (role, msg) in enumerate(messages):
     bgcolor = "#ace" if role == "user" else "#146"
     with stylable_container(
-        key=f"msg_{idx}",
+        key=f"msg_{i}",
         css_styles=(
             f"background-color:{bgcolor};"
             "padding:12px;"
@@ -105,11 +100,9 @@ for idx, (role, msg) in enumerate(messages):
         speaker = "You" if role == "user" else "Jarvis"
         st.markdown(f"**{speaker}:**  {msg}")
 
-# ─── USER INPUT & ACTIONS ───────────────────────────────
+# ─── USER INPUT & ACTION ───────────────────────────────
 prompt = st.text_input("Your message…", key="prompt_input")
-send   = st.button("Send")
-
-if send and prompt.strip():
+if st.button("Send") and prompt.strip():
     save_message(st.session_state.active, "user", prompt)
     code = extract_code(prompt)
     if code:
@@ -119,10 +112,11 @@ if send and prompt.strip():
         with st.spinner("Jarvis is thinking…"):
             reply = ollama_chat(build_messages(st.session_state.active, prompt))
         save_message(st.session_state.active, "assistant", reply)
-    st.experimental_rerun()
+    # Clear input without rerun
+    st.session_state.prompt_input = ""
 
 # ─── PLAY VOICE REPLY ───────────────────────────────────
-# After rerun, load latest assistant message and play TTS
+# After message added, refresh and play TTS for the latest assistant reply
 messages = load_messages(st.session_state.active, MAX_CONTEXT)
 if messages and messages[-1][0] == "assistant":
     play_tts(messages[-1][1])
