@@ -9,7 +9,7 @@ from db import load_messages, get_persona
 
 # ─── Configuration ────────────────────────────────
 HF_TOKEN   = "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"
-MODEL_ID   = "meta-llama/Llama-2-7b-chat-hf"
+MODEL_ID   = "deepseek-ai/DeepSeek-R1-0528"
 API_URL    = f"https://api-inference.huggingface.co/models/{MODEL_ID}"
 HEADERS    = {"Authorization": f"Bearer {HF_TOKEN}"} if HF_TOKEN else {}
 
