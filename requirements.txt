@@ -1,0 +1,6 @@
+streamlit
+ollama
+streamlit-extras
+gTTS
+SpeechRecognition
+pydub
