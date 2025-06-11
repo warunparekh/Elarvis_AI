@@ -37,16 +37,23 @@ st.sidebar.title("🤖 JARVIS")
 convos = get_convos()
 names  = [name for _, name in convos]
 
-if "active" not in st.session_state:
-    if convos:
-        st.session_state.active = convos[0][0]
-    else:
-        st.session_state.active = create_convo("Main", DEFAULT_PERSONA)
+# Ensure there is at least one conversation
+if not convos:
+    cid = create_convo("Main", DEFAULT_PERSONA)
+    convos = get_convos()
+    names  = [name for _, name in convos]
 
-# Select conversation
-selected = st.sidebar.radio("Conversations", names,
-    index=names.index(next(n for i,n in convos if i == st.session_state.active))
-)
+# Initialize active convo
+if "active" not in st.session_state or st.session_state.active not in [cid for cid, _ in convos]:
+    st.session_state.active = convos[0][0]
+
+# Compute selected index safely
+try:
+    idx = [cid for cid, _ in convos].index(st.session_state.active)
+except ValueError:
+    idx = 0
+
+selected = st.sidebar.radio("Conversations", names, index=idx)
 st.session_state.active = convos[names.index(selected)][0]
 
 # Buttons for convos
