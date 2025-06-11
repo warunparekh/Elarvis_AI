@@ -8,8 +8,8 @@ import requests
 from db import load_messages, get_persona
 
 # ─── Configuration ────────────────────────────────
-HF_TOKEN   = os.getenv("HF_TOKEN")
-MODEL_ID   = os.getenv("HF_MODEL", "meta-llama/Llama-2-7b-chat-hf")
+HF_TOKEN   = "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"
+MODEL_ID   = "meta-llama/Llama-2-7b-chat-hf"
 API_URL    = f"https://api-inference.huggingface.co/models/{MODEL_ID}"
 HEADERS    = {"Authorization": f"Bearer {HF_TOKEN}"} if HF_TOKEN else {}
 
