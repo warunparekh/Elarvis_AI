@@ -1,29 +1,27 @@
+# HF_TOKEN   = "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"
+
 # llm.py
 
-import os
-import sys
-import io
-import re
-import requests
+import os, sys, io, re, requests
 from db import load_messages, get_persona
 
 # ─── Configuration ────────────────────────────────
-HF_TOKEN   = "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"
-MODEL_ID   = "tiiuae/falcon-7b-instruct"
-API_URL    = f"https://api-inference.huggingface.co/models/{MODEL_ID}"
-HEADERS    = {"Authorization": f"Bearer {HF_TOKEN}"} if HF_TOKEN else {}
+MODEL_ID = "microsoft/DialoGPT-medium"
+API_URL  = f"https://api-inference.huggingface.co/models/{MODEL_ID}"
+HF_TOKEN = "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"  # optional; DialoGPT is public
+HEADERS  = {"Authorization": f"Bearer {HF_TOKEN}"} if HF_TOKEN else {}
 
 DEFAULT_PERSONA = (
-    "Your name is Jarvis. Never call yourself AI or assistant; you are Jarvis. "
-    "Developer is Elarvis. Be witty, friendly, curious, and adaptive."
+    "Your name is Jarvis. Never call yourself AI or assistant, only Jarvis. "
+    "Developer is Elarvis. Be witty and friendly."
 )
 
-# ─── Helpers ────────────────────────────────────────
 def build_prompt(convo_id, user_prompt):
     persona = get_persona(convo_id, DEFAULT_PERSONA)
     history = load_messages(convo_id)
-    prompt = persona + "\n\n"
-    for role, content in history:
+    # DialoGPT prefers just the last exchange, but we can concatenate
+    prompt = persona + "\n"
+    for role, content in history[-3:]:
         speaker = "User" if role == "user" else "Jarvis"
         prompt += f"{speaker}: {content}\n"
     prompt += f"User: {user_prompt}\nJarvis:"
@@ -31,24 +29,23 @@ def build_prompt(convo_id, user_prompt):
 
 def huggingface_chat(convo_id, user_prompt):
     prompt = build_prompt(convo_id, user_prompt)
-    payload = {
-        "inputs": prompt,
-        "parameters": {"max_new_tokens": 300, "temperature": 0.7},
-        "options": {"use_cache": False}
-    }
+    payload = {"inputs": prompt}
     try:
-        resp = requests.post(API_URL, headers=HEADERS, json=payload, timeout=60)
-        resp.raise_for_status()
-        completion = resp.json()
-        # HF returns [{"generated_text":"..."}]
-        text = completion[0].get("generated_text", "")
-        # strip the prompt from the response
-        return text[len(prompt):].strip()
+        r = requests.post(API_URL, headers=HEADERS, json=payload, timeout=60)
+        r.raise_for_status()
+        data = r.json()
+        # e.g. {"generated_text":"..."}
+        text = data.get("generated_text", "")
+        # strip repeat of prompt
+        if text.startswith(prompt):
+            return text[len(prompt):].strip()
+        return text.strip()
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 404:
+            return "[Model error: model not found]"
+        return f"[HTTP error: {e}]"
     except Exception as e:
-        msg = str(e)
-        if "401" in msg or "403" in msg:
-            return "[Model error: Invalid or missing HF_TOKEN]"
-        return f"[Model error: {e}]"
+        return f"[Error: {e}]"
 
 def safe_execute(code):
     buf = io.StringIO(); old = sys.stdout; sys.stdout = buf
@@ -61,7 +58,7 @@ def safe_execute(code):
     return buf.getvalue().strip() or "[No output]"
 
 def extract_code(text):
-    # run: python: ```python ...
+    # run: ... or ```python ... ```
     m = re.search(r'(?i)(?:run:|execute:|python:)\s*(.*)', text)
     if m: return m.group(1)
     m = re.search(r'```(?:python)?\s*([\s\S]*?)```', text)
