@@ -4,7 +4,7 @@ import os, sys, io, re, requests
 from db import load_messages, get_persona
 
 # ─── Configuration ────────────────────────────────────
-HF_TOKEN = "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"
+HF_TOKEN = "YOUR_TOKEN"
 if not HF_TOKEN:
     raise RuntimeError(
         "HF_TOKEN not set! You must export your Hugging Face token as HF_TOKEN "
